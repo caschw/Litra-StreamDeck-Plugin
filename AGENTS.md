@@ -10,7 +10,7 @@
 - `scripts/`: build/package verification.
 - `docs/`: contributor and user documentation.
 
-Source boundaries: edit `src/`, `tests/`, `docs/`, root metadata, and source assets. Do not hand-edit generated `com.caschw.litra.sdPlugin/bin/plugin.js` or generated helper copies as source.
+Source boundaries: edit `src/`, `tests/`, `docs/`, root metadata, and source assets. Do not hand-edit generated `com.caschw.litra.sdPlugin/bin/plugin.mjs`, dependency notices, or generated helper copies as source.
 
 ## Verified commands
 
@@ -23,9 +23,12 @@ node scripts/package-plugin.mjs
 npm run verify:package
 npm run validate
 npm run package
+npm run test:installer
 ```
 
 Node 24 is required by the pinned Stream Deck SDK. Stream Deck 7.1, macOS 13+, and Windows 10+ are the manifest baseline.
+
+`build` typechecks and bundles the SDK/runtime dependencies into one ESM entrypoint using esbuild, leaving only Node builtins external. It also generates the shipped dependency licenses. `test:installer` extracts the real installer to a temporary directory outside the repository, starts it without `node_modules`, and checks SDK registration and unavailable-action feedback with a mock Stream Deck WebSocket. It verifies all helper hashes, then removes only the extracted helper executables before starting the process to guarantee no hardware I/O.
 
 ## Mandatory invariants
 

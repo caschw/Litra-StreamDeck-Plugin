@@ -8,8 +8,7 @@
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
     "rootDir": "src",
-    "outDir": "com.caschw.litra.sdPlugin/bin",
-    "sourceMap": true,
+    "noEmit": true,
     "types": ["node"]
   },
   "include": ["src/**/*.ts"]

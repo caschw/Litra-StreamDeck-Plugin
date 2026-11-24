@@ -17,6 +17,18 @@ Bundled assets:
 | Windows x64 | `4024567efadd7fb54611a865be784012059e322221c0356150184dcb60283bdb` |
 | Windows ARM64 | `8a6942cd6e69856037201ab13ab4b6923ab6b8b2363b4031b43e086bc207db6b` |
 
-## Stream Deck SDK
+## Bundled JavaScript runtime dependencies
 
-This project uses `@elgato/streamdeck` 3.0.4 and `@elgato/cli` 1.10.4 under their published package licenses. Package dependencies and transitive licenses are recorded by npm lockfiles and should be rechecked before release.
+The standalone ESM entrypoint bundles these npm packages, all under the MIT license:
+
+| Package | Locked version |
+|---|---|
+| `@elgato/streamdeck` | 3.0.4 |
+| `@elgato/schemas` | 0.6.0 |
+| `@elgato/utils` | 0.6.2 |
+| `ws` | 8.23.0 |
+| `zod` | 3.25.76 |
+
+Full copyright and license texts are copied from the installed packages during the build to [`com.caschw.litra.sdPlugin/THIRD_PARTY_JAVASCRIPT_LICENSES.txt`](com.caschw.litra.sdPlugin/THIRD_PARTY_JAVASCRIPT_LICENSES.txt) and included in every installer. Native optional `ws` accelerators are disabled; Node builtins remain external and are supplied by Stream Deck.
+
+Development-only tools (including esbuild, fflate, jsdom, Vitest and `@elgato/cli` 1.10.4) are not shipped. The npm lockfile records their dependency versions.

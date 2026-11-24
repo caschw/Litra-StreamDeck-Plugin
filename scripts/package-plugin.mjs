@@ -10,7 +10,7 @@ for (const asset of ["darwin-universal", "windows-amd64", "windows-arm64"]) {
   const target = path.join(helperRoot, asset);
   cpSync(source, target, { recursive: true, preserveTimestamps: true });
 }
-if (!existsSync(path.join(plugin, "bin", "plugin.js"))) {
+if (!existsSync(path.join(plugin, "bin", "plugin.mjs"))) {
   throw new Error("Plugin JavaScript not built; run npm run build first.");
 }
 writeFileSync(path.join(plugin, "bin", "litra-assets.json"), JSON.stringify({

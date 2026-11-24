@@ -6,7 +6,8 @@ const root = process.cwd();
 const manifestPath = path.join(root, "com.caschw.litra.sdPlugin", "manifest.json");
 const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
 const required = [
-  "com.caschw.litra.sdPlugin/bin/plugin.js",
+  "com.caschw.litra.sdPlugin/bin/plugin.mjs",
+  "com.caschw.litra.sdPlugin/THIRD_PARTY_JAVASCRIPT_LICENSES.txt",
   "com.caschw.litra.sdPlugin/layouts/dial.json",
   "com.caschw.litra.sdPlugin/ui/property-inspector.html",
 ];
@@ -32,6 +33,9 @@ for (const [asset, expected] of Object.entries(hashes)) {
     : `bin/litra/${asset}/litra.exe`;
   const actual = createHash("sha256").update(readFileSync(path.join(root, rel))).digest("hex");
   if (actual !== expected) throw new Error(`Hash mismatch for ${rel}: ${actual}`);
+  const packaged = createHash("sha256").update(readFileSync(path.join(root, "com.caschw.litra.sdPlugin", rel))).digest("hex");
+  if (packaged !== expected) throw new Error(`Packaged helper hash mismatch for ${rel}: ${packaged}`);
 }
 if (manifest.UUID !== "com.caschw.litra") throw new Error("Unexpected plugin UUID");
+if (manifest.CodePath !== "bin/plugin.mjs") throw new Error("Manifest must launch the bundled ESM entrypoint.");
 console.log("Package structure and pinned helper hashes verified.");

@@ -70,7 +70,7 @@
   "Author": "caschw",
   "Category": "Litra",
   "CategoryIcon": "imgs/category",
-  "CodePath": "bin/plugin.js",
+  "CodePath": "bin/plugin.mjs",
   "Description": "Confirmed-state controls for Logitech Litra lights.",
   "Icon": "imgs/plugin",
   "Name": "Litra",
