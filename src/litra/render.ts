@@ -8,8 +8,8 @@ export function frontBrightnessPercent(device: LitraDevice): number {
 
 export function dialFeedback(device: LitraDevice, property: "frontBrightness" | "frontTemperature" | "rearBrightness"): {
   title: string;
-  value: number;
-  indicator: number;
+  value: number | null;
+  indicator: number | null;
 } {
   if (property === "frontTemperature") {
     const span = device.maximum_temperature_in_kelvin - device.minimum_temperature_in_kelvin;
@@ -20,7 +20,7 @@ export function dialFeedback(device: LitraDevice, property: "frontBrightness" | 
   }
   if (property === "rearBrightness") {
     const value = device.back_brightness_percentage;
-    return { title: "Rear", value: value ?? 0, indicator: value ?? 0 };
+    return { title: "Rear", value, indicator: value };
   }
   const value = frontBrightnessPercent(device);
   return { title: "Brightness", value, indicator: value };

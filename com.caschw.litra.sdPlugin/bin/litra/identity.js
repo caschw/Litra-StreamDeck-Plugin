@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.targetForDevice = targetForDevice;
+exports.targetArgv = targetArgv;
 exports.findUniqueTarget = findUniqueTarget;
 exports.validateUniqueSelection = validateUniqueSelection;
 function targetForDevice(device) {
@@ -11,6 +12,13 @@ function targetForDevice(device) {
         return { devicePath: device.device_path };
     }
     return null;
+}
+function targetArgv(target) {
+    if (target.serialNumber)
+        return ["--serial-number", target.serialNumber];
+    if (target.devicePath)
+        return ["--device-path", target.devicePath];
+    throw new Error("A serial number or device path is required.");
 }
 function findUniqueTarget(devices, target) {
     if (target.serialNumber) {

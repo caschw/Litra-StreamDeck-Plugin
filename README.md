@@ -31,7 +31,7 @@ No end-user Node.js, Rust/Cargo, Homebrew, or standalone Litra CLI installation 
 
 - A power key set to **Toggle** displays ON or OFF from confirmed device state.
 - A numeric brightness key set to **Set** and preset `50` writes 50% of the device's native lumen range.
-- A temperature dial set to sensitivity `3` adds or subtracts 300 K per detent.
+- A temperature dial set to sensitivity `3` adds or subtracts 300 K per detent. Sensitivity is a step size per detent (1-5), not a dial burst count.
 - A Beam LX rear brightness dial reports 1-100% and press toggles rear power.
 
 Front 0% is the native minimum brightness, not the Off state. `Off` is controlled separately. Values remain pending or unavailable until a successful post-write readback confirms them.

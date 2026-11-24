@@ -12,12 +12,10 @@
   </style>
 </head>
 <body>
-  <label>Target
-    <select id="targetMode"><option value="serial">Serial number</option><option value="path">Device path</option></select>
+  <label>Light
+    <select id="target"></select>
   </label>
-  <label>Serial number or path
-    <input id="target" autocomplete="off" placeholder="Read from the device list">
-  </label>
+  <button id="refresh" type="button">Refresh lights</button>
   <label>Side/property
     <select id="property">
       <option value="frontBrightness">Front brightness</option>
@@ -37,44 +35,102 @@
   <label><input id="rear" type="checkbox"> This action controls the LX rear side</label>
   <div class="status" id="status">Select an exact serial number or device path. USB reconnects can change a path.</div>
   <script>
-    let ws, uuid, actionInfo;
-    const fields = ["targetMode","target","property","operation","preset","sensitivity","rear"];
-    window.connectElgatoStreamDeckSocket = function(port, uuidValue, event, info, language, localized) {
+    let ws, uuid, actionInfo, devices = [], currentActionManifest = "";
+    const fields = ["target","property","operation","preset","sensitivity","rear"];
+    window.connectElgatoStreamDeckSocket = function(port, uuidValue, event, appInfo, actionInfoArgument) {
       uuid = uuidValue;
-      actionInfo = JSON.parse(info);
+      actionInfo = JSON.parse(actionInfoArgument);
+      currentActionManifest = actionInfo.action;
       ws = new WebSocket("ws://127.0.0.1:" + port);
-      ws.onopen = () => ws.send(JSON.stringify({ event, uuid }));
+      ws.onopen = () => {
+        ws.send(JSON.stringify({ event, uuid }));
+        ws.send(JSON.stringify({ event: "sendToPlugin", action: uuid, context: actionInfo.context, payload: { event: "getInitialData" } }));
+      };
       ws.onmessage = (message) => {
         const data = JSON.parse(message.data);
         if (data.event === "didReceiveSettings") load(data.payload.settings);
+        if (data.event === "sendToPropertyInspector") handleData(data.payload);
       };
-      ws.onopen && load(actionInfo.payload.settings);
+      load(actionInfo.payload.settings);
     };
+    function handleData(data) {
+      if (!data || data.event !== "initialData") return;
+      devices = Array.isArray(data.devices) ? data.devices : [];
+      const target = document.getElementById("target");
+      target.innerHTML = "";
+      for (const device of devices) {
+        const option = document.createElement("option");
+        const duplicateSerial = device.serial_number
+          && devices.filter((candidate) => candidate.serial_number === device.serial_number).length > 1;
+        option.value = (duplicateSerial || !device.serial_number) && device.device_path
+          ? "path:" + device.device_path
+          : "serial:" + device.serial_number;
+        option.textContent = (device.device_type_display || device.device_type)
+          + (device.serial_number ? " · " + device.serial_number : " · " + device.device_path);
+        target.appendChild(option);
+      }
+      if (target.options.length === 0) {
+        const option = document.createElement("option");
+        option.text = "No readable lights";
+        target.appendChild(option);
+      }
+      if (data.settings) load(data.settings);
+      configureForAction();
+      document.getElementById("status").textContent = data.error || "Confirmed live device state.";
+    }
+    function configureForAction() {
+      const property = document.getElementById("property");
+      const operation = document.getElementById("operation");
+      const preset = document.getElementById("preset");
+      const sensitivity = document.getElementById("sensitivity");
+      const rear = document.getElementById("rear");
+      if (currentActionManifest.endsWith(".power")) {
+        operation.innerHTML = '<option value="toggle">Toggle</option><option value="on">On</option><option value="off">Off</option>';
+        property.innerHTML = '<option value="frontBrightness">Front power</option><option value="rearBrightness">LX rear power</option>';
+        preset.disabled = true; sensitivity.disabled = true;
+      } else if (currentActionManifest.endsWith(".numeric")) {
+        operation.innerHTML = '<option value="set">Set</option><option value="increase">Increase</option><option value="decrease">Decrease</option>';
+        property.innerHTML = '<option value="frontBrightness">Front brightness (%)</option><option value="frontTemperature">Front temperature (K)</option><option value="rearBrightness">LX rear brightness (%)</option>';
+        sensitivity.disabled = true; preset.disabled = false;
+      } else {
+        operation.innerHTML = '<option value="set">Set at dial position</option>';
+        property.innerHTML = '<option value="frontBrightness">Front brightness (%)</option><option value="frontTemperature">Front temperature (K)</option><option value="rearBrightness">LX rear brightness (%)</option>';
+        preset.disabled = true; sensitivity.disabled = false;
+      }
+    }
     function load(settings) {
-      document.getElementById("target").value = settings.serialNumber || settings.devicePath || "";
-      document.getElementById("targetMode").value = settings.serialNumber ? "serial" : "path";
+      const target = document.getElementById("target");
+      const desired = settings.serialNumber ? "serial:" + settings.serialNumber : settings.devicePath ? "path:" + settings.devicePath : "";
+      for (const option of target.options) if (option.value === desired) target.value = desired;
       document.getElementById("property").value = settings.property || "frontBrightness";
       document.getElementById("operation").value = settings.operation || "toggle";
-      document.getElementById("preset").value = settings.preset ?? 5;
+      document.getElementById("preset").value = settings.preset !== undefined ? settings.preset : 5;
       document.getElementById("sensitivity").value = settings.sensitivity ?? 1;
       document.getElementById("rear").checked = settings.rear === true;
     }
     for (const id of fields) document.getElementById(id).addEventListener("change", save);
     function save() {
-      const mode = document.getElementById("targetMode").value;
-      const target = document.getElementById("target").value.trim();
+      const selected = document.getElementById("target").value;
+      const [mode, ...parts] = selected.split(":");
+      const target = parts.join(":").trim();
       const sensitivityValue = Math.min(5, Math.max(1, Number(document.getElementById("sensitivity").value) || 1));
       const settings = {
+        targetMode: mode === "path" ? "path" : "serial",
         serialNumber: mode === "serial" ? target : "",
         devicePath: mode === "path" ? target : "",
         property: document.getElementById("property").value,
         operation: document.getElementById("operation").value,
-        preset: Number(document.getElementById("preset").value) || 1,
+        preset: Number(document.getElementById("preset").value),
         sensitivity: sensitivityValue,
         rear: document.getElementById("rear").checked
       };
       if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ event: "setSettings", context: actionInfo.context, payload: settings }));
+        ws.send(JSON.stringify({
+          event: "sendToPlugin",
+          action: uuid,
+          context: actionInfo.context,
+          payload: { event: "saveSettings", settings }
+        }));
       }
     }
   </script>

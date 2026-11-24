@@ -13,7 +13,7 @@
 
 | Model | Intended controls | Hardware verified |
 |---|---|---|
-| Glow | Front power, brightness, temperature | Glow read only |
+| Glow | Front power, brightness, temperature | Earlier live read verified; not currently readable |
 | Beam | Front power, brightness, temperature | No |
 | Beam LX | Front plus rear power/brightness | No |
 

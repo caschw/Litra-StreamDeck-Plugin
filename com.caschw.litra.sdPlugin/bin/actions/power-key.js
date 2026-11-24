@@ -36,6 +36,7 @@ var __runInitializers = (this && this.__runInitializers) || function (thisArg, i
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.registerPowerAction = registerPowerAction;
 const streamdeck_1 = require("@elgato/streamdeck");
+const identity_js_1 = require("../litra/identity.js");
 const targeting_js_1 = require("../litra/targeting.js");
 function registerPowerAction(state) {
     let PowerAction = (() => {
@@ -53,61 +54,140 @@ function registerPowerAction(state) {
                 if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
                 __runInitializers(_classThis, _classExtraInitializers);
             }
+            unsubscribe;
+            revision = new Map();
             async onWillAppear(ev) {
                 state.setVisible(ev.action.id, true);
                 await this.refresh(ev.action, ev.payload.settings);
+                if (!this.unsubscribe) {
+                    this.unsubscribe = state.subscribe((notification) => this.onState(notification));
+                }
             }
-            async onWillDisappear(ev) {
+            onWillDisappear(ev) {
                 state.setVisible(ev.action.id, false);
             }
             async onDidReceiveSettings(ev) {
+                this.revision.set(ev.action.id, (this.revision.get(ev.action.id) ?? 0) + 1);
                 await this.refresh(ev.action, ev.payload.settings);
             }
             async onKeyDown(ev) {
-                const settings = ev.payload.settings;
+                let settings;
+                try {
+                    settings = (0, targeting_js_1.validateActionSettings)(ev.payload.settings);
+                }
+                catch (error) {
+                    await ev.action.showAlert();
+                    await ev.action.setTitle("Invalid");
+                    return;
+                }
                 const target = (0, targeting_js_1.settingsTarget)(settings);
+                const rear = settings.rear === true;
                 const operation = ev.payload.isInMultiAction
                     ? (ev.payload.userDesiredState === 1 ? "off" : "on")
                     : settings.operation ?? "toggle";
-                const rear = settings.rear === true;
-                const command = rear
-                    ? (operation === "on" ? "back-on" : operation === "off" ? "back-off" : "back-toggle")
-                    : (operation === "on" ? "on" : operation === "off" ? "off" : "toggle");
-                ev.action.setTitle("Pending", { target: 0 });
+                const generation = this.revision.get(ev.action.id) ?? 0;
+                await ev.action.setTitle(rear ? "Rear pending" : "Pending");
+                let desired = null;
                 const result = await state.mutate(target, (device) => {
-                    const args = [command];
-                    if (device.serial_number)
-                        args.push("--serial-number", device.serial_number);
-                    else if (device.device_path)
-                        args.push("--device-path", device.device_path);
-                    return args;
-                });
-                await this.refresh(ev.action, settings, result.error);
+                    const current = rear ? device.is_back_on : device.is_on;
+                    if (operation === "toggle") {
+                        desired = current === null ? null : !current;
+                        return rear
+                            ? [desired ? "back-on" : "back-off", ...(0, identity_js_1.targetArgv)(target)]
+                            : [desired ? "on" : "off", ...(0, identity_js_1.targetArgv)(target)];
+                    }
+                    desired = operation === "on";
+                    return rear
+                        ? [operation === "on" ? "back-on" : "back-off", ...(0, identity_js_1.targetArgv)(target)]
+                        : [operation === "on" ? "on" : "off", ...(0, identity_js_1.targetArgv)(target)];
+                }, (_before, after) => desired === null ? true : rear
+                    ? after.is_back_on === desired
+                    : after.is_on === desired);
+                if (generation !== (this.revision.get(ev.action.id) ?? 0))
+                    return;
+                await this.refresh(ev.action, settings, result.device ?? null, result.error);
             }
-            async refresh(action, settings, error) {
-                const target = (0, targeting_js_1.settingsTarget)(settings);
-                let device = null;
+            async onState(notification) {
+                for (const action of this.actions) {
+                    if (!action.isKey())
+                        continue;
+                    const settings = await action.getSettings();
+                    let validated;
+                    try {
+                        validated = (0, targeting_js_1.validateActionSettings)(settings);
+                    }
+                    catch {
+                        await action.setTitle("Invalid");
+                        await action.showAlert();
+                        continue;
+                    }
+                    await this.render(notification, action, validated);
+                }
+            }
+            async refresh(action, settings, readback, error) {
+                if (readback) {
+                    await this.renderDevice(action, settings, readback, error ? "error" : "confirmed", error);
+                    return;
+                }
                 try {
                     const result = await state.refresh();
-                    device = result.devices.find((d) => (target.serialNumber && d.serial_number === target.serialNumber)
-                        || (target.devicePath && d.device_path === target.devicePath)) ?? null;
+                    await this.render({ devices: result.devices, revision: result.revision, status: error ? "error" : "confirmed", error }, action, settings);
                 }
                 catch (refreshError) {
                     await action.setImage("imgs/error.png");
                     await action.setTitle("Unavailable");
+                    await action.showAlert();
+                    console.error("Litra power refresh failed", refreshError);
+                }
+            }
+            async render(notification, action, settings) {
+                const target = (0, targeting_js_1.settingsTarget)(settings);
+                let device = null;
+                try {
+                    (0, identity_js_1.validateUniqueSelection)([...notification.devices], target);
+                    device = (0, identity_js_1.findUniqueTarget)([...notification.devices], target);
+                }
+                catch (error) {
+                    await action.setImage("imgs/error.png");
+                    await action.setTitle(notification.status === "pending" ? "Pending" : "Unavailable");
+                    if (notification.status === "error")
+                        await action.showAlert();
+                    console.error("Litra power target unavailable", error);
                     return;
                 }
                 if (!device) {
                     await action.setImage("imgs/error.png");
-                    await action.setTitle(error ? "Error" : "Unavailable");
+                    await action.setTitle("Unavailable");
                     return;
                 }
+                await this.renderDevice(action, settings, device, notification.status, notification.error);
+            }
+            async renderDevice(action, settings, device, status, error) {
                 const rear = settings.rear === true;
                 const actual = rear ? device.is_back_on : device.is_on;
-                await action.setImage(actual ? "imgs/power-on.png" : "imgs/power-off.png");
-                await action.setTitle(error ? "Error" : actual ? "ON" : "OFF");
-                if (error)
+                if (status === "pending") {
+                    await action.setTitle(rear ? "Rear pending" : "Pending");
+                    await action.setImage("imgs/power.png");
+                    return;
+                }
+                if (status === "error") {
+                    await action.setImage("imgs/error.png");
+                    await action.setTitle(actual === null ? "UNKNOWN" : actual ? "ON" : "OFF");
                     await action.showAlert();
+                    console.error("Litra power state error", error);
+                    return;
+                }
+                if (rear && actual === null) {
+                    await action.setImage("imgs/error.png");
+                    await action.setTitle("UNKNOWN");
+                    await action.setState(0);
+                    return;
+                }
+                await action.setImage(actual ? "imgs/power-on.png" : "imgs/power-off.png");
+                const operation = settings.operation ?? "toggle";
+                const label = operation === "toggle" ? "Toggle" : operation === "on" ? "On" : "Off";
+                await action.setTitle(`${label}\n${actual ? "ON" : "OFF"}`);
+                await action.setState(actual ? 1 : 0);
             }
         };
         return PowerAction = _classThis;

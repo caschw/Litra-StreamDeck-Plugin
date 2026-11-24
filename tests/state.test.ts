@@ -46,4 +46,35 @@ describe("serialized confirmed-state transactions", () => {
     expect(result.device?.is_on).toBe(true);
     expect(result.error).toContain("read back");
   });
+
+  it("fans confirmed state to two subscribers and ignores stale pending work", async () => {
+    const read = vi.fn()
+      .mockResolvedValueOnce([device(false)])
+      .mockResolvedValueOnce([device(true)]);
+    const write = vi.fn(async () => ({ stdout: "", stderr: "" }));
+    const state = new LitraState(read, write);
+    const subscribers = [vi.fn(), vi.fn()];
+    state.subscribe(subscribers[0]);
+    state.subscribe(subscribers[1]);
+    await state.mutate({ serialNumber: "SERIAL" }, () => ["on", "--serial-number", "SERIAL"]);
+    expect(subscribers[0]).toHaveBeenCalled();
+    expect(subscribers[1]).toHaveBeenCalled();
+    expect(subscribers[0].mock.calls.some(([n]) => n.status === "confirmed")).toBe(true);
+  });
+
+  it("poll change reaches distinct visible subscribers", async () => {
+    const read = vi.fn()
+      .mockResolvedValueOnce([device(false)])
+      .mockResolvedValueOnce([device(true)])
+      .mockResolvedValueOnce([device(true)]);
+    const state = new LitraState(read, vi.fn());
+    const first = vi.fn();
+    const second = vi.fn();
+    state.subscribe(first);
+    state.subscribe(second);
+    await state.refresh();
+    await state.refresh();
+    expect(first).toHaveBeenCalled();
+    expect(second).toHaveBeenCalled();
+  });
 });

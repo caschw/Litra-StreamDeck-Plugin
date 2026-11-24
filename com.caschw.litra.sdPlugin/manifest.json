@@ -11,8 +11,13 @@
       ],
       "States": [
         {
-          "Name": "Power",
+          "Name": "Off",
           "Image": "imgs/power-off",
+          "TitleAlignment": "middle"
+        },
+        {
+          "Name": "On",
+          "Image": "imgs/power-on",
           "TitleAlignment": "middle"
         }
       ],

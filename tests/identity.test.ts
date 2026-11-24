@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { findUniqueTarget, validateUniqueSelection } from "../src/litra/identity.js";
+import { targetArgv } from "../src/litra/identity.js";
 import type { LitraDevice } from "../src/litra/types.js";
 
 const device = (serial: string | null, path: string): LitraDevice => ({
@@ -31,5 +32,14 @@ describe("exact device identity", () => {
 
   it("disambiguates using path", () => {
     expect(findUniqueTarget([device(null, "P1"), device(null, "P2")], { devicePath: "P2" })?.device_path).toBe("P2");
+  });
+
+  it("uses only the selected path target when serial is unknown or duplicate", () => {
+    expect(targetArgv({ devicePath: "P2" })).toEqual(["--device-path", "P2"]);
+    expect(targetArgv({ serialNumber: "UNKNOWN", devicePath: "P2" })).toEqual(["--serial-number", "UNKNOWN"]);
+  });
+
+  it("rejects ambiguous serial selection instead of falling back to first device", () => {
+    expect(() => validateUniqueSelection([device("A", "P1"), device("A", "P2")], { serialNumber: "A" })).toThrow(/ambiguous/i);
   });
 });

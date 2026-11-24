@@ -11,6 +11,7 @@ const node_child_process_1 = require("node:child_process");
 const node_fs_1 = require("node:fs");
 const node_path_1 = __importDefault(require("node:path"));
 const node_process_1 = __importDefault(require("node:process"));
+const validation_js_1 = require("./validation.js");
 class LitraProcessError extends Error {
     partialReadAllowed;
     constructor(message, partialReadAllowed = false) {
@@ -70,10 +71,16 @@ function runHelper(args, timeoutMs = 5000, platform = node_process_1.default.pla
                 return reject(new LitraProcessError(`Bundled Litra helper failed: ${stderr.trim() || error.message}`, true));
             resolve({ stdout, stderr });
         });
-        if (typeof child.killed === "boolean") {
-            const timer = setTimeout(() => { timedOut = true; }, timeoutMs);
-            child.once("close", () => clearTimeout(timer));
-        }
+        const timer = setTimeout(() => {
+            timedOut = true;
+            if (!child.killed)
+                child.kill();
+        }, timeoutMs);
+        child.once("close", () => clearTimeout(timer));
+        child.once("error", (error) => {
+            clearTimeout(timer);
+            reject(new LitraProcessError(`Unable to start bundled Litra helper: ${error.message}`));
+        });
     });
 }
 async function readDevices(platform = node_process_1.default.platform, arch = node_process_1.default.arch) {
@@ -85,8 +92,11 @@ async function readDevices(platform = node_process_1.default.platform, arch = no
     catch {
         throw new LitraProcessError("Bundled Litra helper returned malformed JSON.");
     }
-    if (!Array.isArray(parsed))
-        throw new LitraProcessError("Bundled Litra helper returned an invalid device list.");
-    return parsed;
+    try {
+        return (0, validation_js_1.validateDevicesJson)(parsed);
+    }
+    catch (error) {
+        throw new LitraProcessError(error instanceof Error ? error.message : "Invalid device JSON.");
+    }
 }
 //# sourceMappingURL=process.js.map

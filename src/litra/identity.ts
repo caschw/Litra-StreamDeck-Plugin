@@ -15,6 +15,12 @@ export function targetForDevice(device: LitraDevice): DeviceTarget | null {
   return null;
 }
 
+export function targetArgv(target: DeviceTarget): string[] {
+  if (target.serialNumber) return ["--serial-number", target.serialNumber];
+  if (target.devicePath) return ["--device-path", target.devicePath];
+  throw new Error("A serial number or device path is required.");
+}
+
 export function findUniqueTarget(
   devices: LitraDevice[],
   target: DeviceTarget,

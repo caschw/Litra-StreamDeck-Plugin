@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import type { LitraDevice } from "./types.js";
+import { validateDevicesJson } from "./validation.js";
 
 export class LitraProcessError extends Error {
   constructor(message: string, readonly partialReadAllowed = false) {
@@ -60,10 +61,15 @@ export function runHelper(
       ));
       resolve({ stdout, stderr });
     });
-    if (typeof child.killed === "boolean") {
-      const timer = setTimeout(() => { timedOut = true; }, timeoutMs);
-      child.once("close", () => clearTimeout(timer));
-    }
+    const timer = setTimeout(() => {
+      timedOut = true;
+      if (!child.killed) child.kill();
+    }, timeoutMs);
+    child.once("close", () => clearTimeout(timer));
+    child.once("error", (error) => {
+      clearTimeout(timer);
+      reject(new LitraProcessError(`Unable to start bundled Litra helper: ${error.message}`));
+    });
   });
 }
 
@@ -78,6 +84,9 @@ export async function readDevices(
   } catch {
     throw new LitraProcessError("Bundled Litra helper returned malformed JSON.");
   }
-  if (!Array.isArray(parsed)) throw new LitraProcessError("Bundled Litra helper returned an invalid device list.");
-  return parsed as LitraDevice[];
+  try {
+    return validateDevicesJson(parsed);
+  } catch (error) {
+    throw new LitraProcessError(error instanceof Error ? error.message : "Invalid device JSON.");
+  }
 }

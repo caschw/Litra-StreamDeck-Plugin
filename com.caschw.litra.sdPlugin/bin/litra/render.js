@@ -18,7 +18,7 @@ function dialFeedback(device, property) {
     }
     if (property === "rearBrightness") {
         const value = device.back_brightness_percentage;
-        return { title: "Rear", value: value ?? 0, indicator: value ?? 0 };
+        return { title: "Rear", value, indicator: value };
     }
     const value = frontBrightnessPercent(device);
     return { title: "Brightness", value, indicator: value };
