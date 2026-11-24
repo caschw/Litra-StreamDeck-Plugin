@@ -40,6 +40,8 @@ Front 0% is the native minimum brightness, not the Off state. `Off` is controlle
 
 The live read of a pinned macOS universal helper succeeded with a Glow. This source does not claim Windows, Beam, or Beam LX hardware verification. Mocked tests cover state and conversion logic; only explicit hardware permission enables mutation tests.
 
+Builds, tests, validation, and installer packaging run **locally only**. This repository has no GitHub Actions workflows; do not enable hosted runners or paid automation. See the [local verification and packaging commands](docs/development.md). Windows installation/runtime checks remain pending until a local Windows host is available.
+
 ## Documentation
 
 - [Getting started](docs/getting-started.md)

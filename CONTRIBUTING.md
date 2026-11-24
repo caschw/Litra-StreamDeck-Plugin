@@ -9,9 +9,12 @@ npm test
 npm run build
 npm run validate
 npm run verify:package
+npm run package -- --force
+npm run test:installer
 ```
 
 Use the pinned Litra binaries. Do not add a system Litra fallback or runtime download.
+Build, test, validate, and package locally only. Do not add GitHub Actions workflows, enable hosted runners, or configure paid automation. Record unavailable local platform/hardware checks as pending.
 
 ## Pull requests
 

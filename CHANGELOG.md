@@ -11,4 +11,5 @@
 - Corrected property-inspector registration/routing and settings restoration, with executable shipped-HTML DOM/WebSocket contracts.
 - Added explicit device selection, capability-aware front/rear choices, native range/current-value status, refresh, and acknowledged Save/Cancel settings.
 - Bundled the SDK and runtime JavaScript into a standalone ESM entrypoint, with full dependency license texts in the installer.
-- Added real-installer isolated runtime smoke coverage and cross-platform path expectations; CI now packs and starts the extracted installer on all runners.
+- Added local real-installer isolated runtime smoke coverage and cross-platform path expectations.
+- Removed GitHub Actions workflows; all verification and packaging are local-only, with unavailable platform checks recorded as pending.

@@ -26,6 +26,10 @@ npm run package
 npm run test:installer
 ```
 
+## Local-only delivery
+
+Run all builds, tests, validation, and packaging locally. Do not add GitHub Actions workflow files, enable Actions, use hosted runners, or configure paid automation. There is intentionally no `.github/workflows/` content. Missing local Windows/hardware coverage must be recorded as pending, not delegated to hosted automation.
+
 Node 24 is required by the pinned Stream Deck SDK. Stream Deck 7.1, macOS 13+, and Windows 10+ are the manifest baseline.
 
 `build` typechecks and bundles the SDK/runtime dependencies into one ESM entrypoint using esbuild, leaving only Node builtins external. It also generates the shipped dependency licenses. `test:installer` extracts the real installer to a temporary directory outside the repository, starts it without `node_modules`, and checks SDK registration and unavailable-action feedback with a mock Stream Deck WebSocket. It verifies all helper hashes, then removes only the extracted helper executables before starting the process to guarantee no hardware I/O.
@@ -53,4 +57,4 @@ Pin and verify assets by SHA-256 in `scripts/verify-package.mjs`. Do not replace
 
 ## Hardware safety
 
-Live status reads are safe for development. Mutating commands are prohibited in tests or CI unless the user explicitly grants hardware permission. Real writes must remain opt-in.
+Live status reads are safe for development. Mutating commands are prohibited in automated checks unless the user explicitly grants hardware permission. Real writes must remain opt-in.
