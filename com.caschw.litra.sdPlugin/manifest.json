@@ -1,0 +1,93 @@
+{
+  "$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
+  "Actions": [
+    {
+      "UUID": "com.caschw.litra.power",
+      "Name": "Litra Power",
+      "Icon": "imgs/power",
+      "Tooltip": "Turn a selected Litra light or rear side on, off, or toggle it.",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Name": "Power",
+          "Image": "imgs/power-off",
+          "TitleAlignment": "middle"
+        }
+      ],
+      "DisableAutomaticStates": true,
+      "SupportedInMultiActions": true
+    },
+    {
+      "UUID": "com.caschw.litra.numeric",
+      "Name": "Litra Numeric",
+      "Icon": "imgs/numeric",
+      "Tooltip": "Set or change a selected Litra brightness or temperature.",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Name": "Numeric",
+          "Image": "imgs/numeric",
+          "TitleAlignment": "middle"
+        }
+      ],
+      "DisableAutomaticStates": true,
+      "SupportedInMultiActions": true
+    },
+    {
+      "UUID": "com.caschw.litra.dial",
+      "Name": "Litra Dial",
+      "Icon": "imgs/dial",
+      "Tooltip": "Adjust a selected Litra value with a dial.",
+      "Controllers": [
+        "Encoder"
+      ],
+      "Encoder": {
+        "layout": "layouts/dial.json",
+        "TriggerDescription": {
+          "Rotate": "Adjust confirmed value",
+          "Push": "Toggle corresponding power"
+        }
+      },
+      "States": [
+        {
+          "Name": "Dial",
+          "Image": "imgs/dial",
+          "TitleAlignment": "middle"
+        }
+      ],
+      "DisableAutomaticStates": true
+    }
+  ],
+  "Author": "caschw",
+  "Category": "Litra",
+  "CategoryIcon": "imgs/category",
+  "CodePath": "bin/plugin.js",
+  "Description": "Confirmed-state controls for Logitech Litra lights.",
+  "Icon": "imgs/plugin",
+  "Name": "Litra",
+  "Nodejs": {
+    "Version": "24"
+  },
+  "OS": [
+    {
+      "Platform": "mac",
+      "MinimumVersion": "13"
+    },
+    {
+      "Platform": "windows",
+      "MinimumVersion": "10"
+    }
+  ],
+  "PropertyInspectorPath": "ui/property-inspector.html",
+  "SDKVersion": 2,
+  "Software": {
+    "MinimumVersion": "7.1"
+  },
+  "URL": "https://github.com/caschw/Litra-StreamDeck-Plugin",
+  "UUID": "com.caschw.litra",
+  "Version": "1.0.0.0"
+}

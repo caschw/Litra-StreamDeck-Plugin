@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Litra settings</title>
+  <style>
+    :root { color-scheme: dark; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    body { margin: 12px; color: #f4f6f8; background: #24282d; }
+    label { display: block; margin-top: 10px; font-size: 12px; }
+    select, input { box-sizing: border-box; width: 100%; margin-top: 5px; min-height: 30px; }
+    .status { color: #b8c3d0; margin-top: 12px; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <label>Target
+    <select id="targetMode"><option value="serial">Serial number</option><option value="path">Device path</option></select>
+  </label>
+  <label>Serial number or path
+    <input id="target" autocomplete="off" placeholder="Read from the device list">
+  </label>
+  <label>Side/property
+    <select id="property">
+      <option value="frontBrightness">Front brightness</option>
+      <option value="frontTemperature">Front temperature</option>
+      <option value="rearBrightness">LX rear brightness</option>
+    </select>
+  </label>
+  <label>Operation
+    <select id="operation"><option value="toggle">Toggle</option><option value="on">On</option><option value="off">Off</option><option value="set">Set</option><option value="increase">Increase</option><option value="decrease">Decrease</option></select>
+  </label>
+  <label>Preset / Kelvin step
+    <input id="preset" type="number" min="1" max="6500" value="5">
+  </label>
+  <label>Dial sensitivity (1-5 detents)
+    <input id="sensitivity" type="number" min="1" max="5" value="1">
+  </label>
+  <label><input id="rear" type="checkbox"> This action controls the LX rear side</label>
+  <div class="status" id="status">Select an exact serial number or device path. USB reconnects can change a path.</div>
+  <script>
+    let ws, uuid, actionInfo;
+    const fields = ["targetMode","target","property","operation","preset","sensitivity","rear"];
+    window.connectElgatoStreamDeckSocket = function(port, uuidValue, event, info, language, localized) {
+      uuid = uuidValue;
+      actionInfo = JSON.parse(info);
+      ws = new WebSocket("ws://127.0.0.1:" + port);
+      ws.onopen = () => ws.send(JSON.stringify({ event, uuid }));
+      ws.onmessage = (message) => {
+        const data = JSON.parse(message.data);
+        if (data.event === "didReceiveSettings") load(data.payload.settings);
+      };
+      ws.onopen && load(actionInfo.payload.settings);
+    };
+    function load(settings) {
+      document.getElementById("target").value = settings.serialNumber || settings.devicePath || "";
+      document.getElementById("targetMode").value = settings.serialNumber ? "serial" : "path";
+      document.getElementById("property").value = settings.property || "frontBrightness";
+      document.getElementById("operation").value = settings.operation || "toggle";
+      document.getElementById("preset").value = settings.preset ?? 5;
+      document.getElementById("sensitivity").value = settings.sensitivity ?? 1;
+      document.getElementById("rear").checked = settings.rear === true;
+    }
+    for (const id of fields) document.getElementById(id).addEventListener("change", save);
+    function save() {
+      const mode = document.getElementById("targetMode").value;
+      const target = document.getElementById("target").value.trim();
+      const sensitivityValue = Math.min(5, Math.max(1, Number(document.getElementById("sensitivity").value) || 1));
+      const settings = {
+        serialNumber: mode === "serial" ? target : "",
+        devicePath: mode === "path" ? target : "",
+        property: document.getElementById("property").value,
+        operation: document.getElementById("operation").value,
+        preset: Number(document.getElementById("preset").value) || 1,
+        sensitivity: sensitivityValue,
+        rear: document.getElementById("rear").checked
+      };
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ event: "setSettings", context: actionInfo.context, payload: settings }));
+      }
+    }
+  </script>
+</body>
+</html>

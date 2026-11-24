@@ -1,0 +1,21 @@
+name: Bug report
+description: Report a Litra Stream Deck plugin issue
+labels: ["bug"]
+body:
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Steps to reproduce, including plugin and Stream Deck versions.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS/CPU, Stream Deck model/software, Litra model, and plugin commit.
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Redacted diagnostics
+      description: Include relevant helper errors but remove serial numbers and device paths.

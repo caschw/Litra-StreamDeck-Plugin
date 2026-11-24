@@ -1,0 +1,29 @@
+{
+  "name": "litra-streamdeck-plugin",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cross-platform Stream Deck controls for Logitech Litra lights",
+  "license": "MIT",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "bundle": "npm run build && node scripts/package-plugin.mjs",
+    "validate": "npx @elgato/cli@1.10.4 validate com.caschw.litra.sdPlugin",
+    "package": "npx @elgato/cli@1.10.4 pack com.caschw.litra.sdPlugin",
+    "verify:package": "node scripts/verify-package.mjs"
+  },
+  "dependencies": {
+    "@elgato/streamdeck": "3.0.4"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "tsx": "4.20.6",
+    "typescript": "5.9.3",
+    "vitest": "3.2.4"
+  }
+}
