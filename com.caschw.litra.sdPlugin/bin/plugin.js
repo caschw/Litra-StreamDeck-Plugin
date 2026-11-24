@@ -23,6 +23,7 @@ streamdeck_1.default.ui.onSendToPlugin(async (ev) => {
         try {
             const settings = (0, validation_js_1.validateActionSettings)(ev.payload.settings);
             await ev.action.setSettings(settings);
+            await streamdeck_1.default.ui.sendToPropertyInspector({ event: "settingsSaved", settings });
         }
         catch (error) {
             await streamdeck_1.default.ui.sendToPropertyInspector({

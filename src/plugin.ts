@@ -27,6 +27,7 @@ streamDeck.ui.onSendToPlugin<{
     try {
       const settings = validateActionSettings(ev.payload.settings as unknown as ActionSettings);
       await ev.action.setSettings(settings);
+      await streamDeck.ui.sendToPropertyInspector({ event: "settingsSaved", settings });
     } catch (error) {
       await streamDeck.ui.sendToPropertyInspector({
         event: "settingsError",

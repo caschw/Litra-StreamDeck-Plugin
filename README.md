@@ -11,7 +11,7 @@ Control Logitech Litra lights directly from Stream Deck with tactile keys and di
 - Explicit front/rear On, Off, and Toggle keys
 - Brightness and temperature numeric Set/Increase/Decrease keys
 - Front brightness, front temperature, and LX rear brightness dials
-- Configurable dial sensitivity from 1 to 5 detents
+- Configurable dial sensitivity from 1 to 5 steps per detent (percentage points or 100 K steps)
 
 There are no RGB color actions: the upstream helper does not expose an actual color getter.
 
@@ -20,8 +20,8 @@ There are no RGB color actions: the upstream helper does not expose an actual co
 1. Use Stream Deck 7.1 or later on macOS 13+ or Windows 10+.
 2. Install and connect a supported Logitech Litra light.
 3. Add a Litra key or dial in Stream Deck.
-4. Select an exact serial number. For a light that does not expose a serial, select its exact device path.
-5. Configure the property, operation, preset, and dial sensitivity.
+4. Explicitly select a light in the device picker. Missing, unknown, or duplicate serials use an exact device path; no first light is chosen automatically.
+5. Configure the property, operation, preset, and dial sensitivity, then **Save settings**. **Cancel** restores saved settings. **Refresh lights** rereads the available devices, current value, and range.
 
 When an installer release exists, download the `.streamDeckPlugin` artifact from GitHub Releases and open it with Stream Deck. Until then, use the developer build instructions in [docs/development.md](docs/development.md).
 

@@ -8,3 +8,5 @@
 - Added 1-5 dial sensitivity and native limit/clamp conversions.
 - Added pinned macOS universal, Windows x64, and Windows ARM64 litra-rs v3.3.0 helper assets.
 - Documented macOS live Glow read coverage and remaining Windows/hardware verification gaps.
+- Corrected property-inspector registration/routing and settings restoration, with executable shipped-HTML DOM/WebSocket contracts.
+- Added explicit device selection, capability-aware front/rear choices, native range/current-value status, refresh, and acknowledged Save/Cancel settings.

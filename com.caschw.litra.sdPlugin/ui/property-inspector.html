@@ -8,12 +8,13 @@
     body { margin: 12px; color: #f4f6f8; background: #24282d; }
     label { display: block; margin-top: 10px; font-size: 12px; }
     select, input { box-sizing: border-box; width: 100%; margin-top: 5px; min-height: 30px; }
-    .status { color: #b8c3d0; margin-top: 12px; font-size: 12px; }
+    .status { color: #b8c3d0; margin-top: 12px; font-size: 12px; overflow-wrap: anywhere; }
+    button { margin-top: 10px; min-height: 30px; }
   </style>
 </head>
 <body>
   <label>Light
-    <select id="target"></select>
+    <select id="target"><option value="">Select a light</option></select>
   </label>
   <button id="refresh" type="button">Refresh lights</button>
   <label>Side/property
@@ -26,111 +27,230 @@
   <label>Operation
     <select id="operation"><option value="toggle">Toggle</option><option value="on">On</option><option value="off">Off</option><option value="set">Set</option><option value="increase">Increase</option><option value="decrease">Decrease</option></select>
   </label>
-  <label>Preset / Kelvin step
-    <input id="preset" type="number" min="1" max="6500" value="5">
+  <label><span id="presetLabel">Preset (%)</span>
+    <input id="preset" type="number" min="0" max="100" step="1" value="5">
   </label>
-  <label>Dial sensitivity (1-5 detents)
+  <label>Dial sensitivity (1-5 steps per detent)
     <input id="sensitivity" type="number" min="1" max="5" value="1">
   </label>
-  <label><input id="rear" type="checkbox"> This action controls the LX rear side</label>
-  <div class="status" id="status">Select an exact serial number or device path. USB reconnects can change a path.</div>
+  <div class="status" id="units"></div>
+  <button id="save" type="button">Save settings</button>
+  <button id="cancel" type="button">Cancel</button>
+  <div class="status" id="status" role="status" aria-live="polite">Select a light. USB reconnects can change a device path.</div>
   <script>
-    let ws, uuid, actionInfo, devices = [], currentActionManifest = "";
-    const fields = ["target","property","operation","preset","sensitivity","rear"];
+    let ws, actionInfo, devices = [], currentActionManifest = "";
+    let savedSettings = {}, pendingSettings = null, discoveryError = "", dirty = false;
+    const field = (id) => document.getElementById(id);
+    const isPower = () => currentActionManifest.endsWith(".power");
+    const isNumeric = () => currentActionManifest.endsWith(".numeric");
+    const isDial = () => currentActionManifest.endsWith(".dial");
+    function send(payload) {
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        field("status").textContent = "Stream Deck connection unavailable. Reopen this inspector.";
+        return false;
+      }
+      ws.send(JSON.stringify({
+        event: "sendToPlugin", action: currentActionManifest, context: actionInfo.context, payload
+      }));
+      return true;
+    }
     window.connectElgatoStreamDeckSocket = function(port, uuidValue, event, appInfo, actionInfoArgument) {
-      uuid = uuidValue;
       actionInfo = JSON.parse(actionInfoArgument);
       currentActionManifest = actionInfo.action;
+      configureForAction();
+      load(actionInfo.payload.settings || {});
       ws = new WebSocket("ws://127.0.0.1:" + port);
       ws.onopen = () => {
-        ws.send(JSON.stringify({ event, uuid }));
-        ws.send(JSON.stringify({ event: "sendToPlugin", action: uuid, context: actionInfo.context, payload: { event: "getInitialData" } }));
+        ws.send(JSON.stringify({ event, uuid: uuidValue }));
+        send({ event: "getInitialData" });
       };
       ws.onmessage = (message) => {
-        const data = JSON.parse(message.data);
-        if (data.event === "didReceiveSettings") load(data.payload.settings);
+        let data;
+        try { data = JSON.parse(message.data); }
+        catch {
+          field("status").textContent = "Invalid message from Stream Deck. Reopen this inspector.";
+          return;
+        }
+        if (data.context && data.context !== actionInfo.context) return;
+        if (data.event === "didReceiveSettings") {
+          pendingSettings = null;
+          load(data.payload.settings || {});
+        }
         if (data.event === "sendToPropertyInspector") handleData(data.payload);
       };
-      load(actionInfo.payload.settings);
+      ws.onerror = ws.onclose = () => {
+        pendingSettings = null;
+        field("save").disabled = false;
+        field("cancel").disabled = false;
+        field("status").textContent = "Stream Deck connection lost. Reopen this inspector.";
+      };
     };
     function handleData(data) {
-      if (!data || data.event !== "initialData") return;
+      if (!data) return;
+      if (data.event === "settingsError") {
+        pendingSettings = null;
+        load(savedSettings);
+        field("status").textContent = data.message || "Settings were rejected; previous settings restored.";
+        return;
+      }
+      if (data.event === "settingsSaved") {
+        const accepted = data.settings || pendingSettings;
+        if (accepted) {
+          pendingSettings = null;
+          load(accepted);
+        }
+        return;
+      }
+      if (data.event !== "initialData") return;
       devices = Array.isArray(data.devices) ? data.devices : [];
-      const target = document.getElementById("target");
-      target.innerHTML = "";
-      for (const device of devices) {
-        const option = document.createElement("option");
-        const duplicateSerial = device.serial_number
-          && devices.filter((candidate) => candidate.serial_number === device.serial_number).length > 1;
-        option.value = (duplicateSerial || !device.serial_number) && device.device_path
-          ? "path:" + device.device_path
-          : "serial:" + device.serial_number;
-        option.textContent = (device.device_type_display || device.device_type)
-          + (device.serial_number ? " · " + device.serial_number : " · " + device.device_path);
-        target.appendChild(option);
+      discoveryError = data.error || "";
+      if (!dirty && !pendingSettings) load(data.settings || savedSettings);
+      else {
+        rebuildTargets(field("target").value);
+        update();
       }
-      if (target.options.length === 0) {
-        const option = document.createElement("option");
-        option.text = "No readable lights";
-        target.appendChild(option);
-      }
-      if (data.settings) load(data.settings);
-      configureForAction();
-      document.getElementById("status").textContent = data.error || "Confirmed live device state.";
     }
     function configureForAction() {
-      const property = document.getElementById("property");
-      const operation = document.getElementById("operation");
-      const preset = document.getElementById("preset");
-      const sensitivity = document.getElementById("sensitivity");
-      const rear = document.getElementById("rear");
-      if (currentActionManifest.endsWith(".power")) {
-        operation.innerHTML = '<option value="toggle">Toggle</option><option value="on">On</option><option value="off">Off</option>';
-        property.innerHTML = '<option value="frontBrightness">Front power</option><option value="rearBrightness">LX rear power</option>';
-        preset.disabled = true; sensitivity.disabled = true;
-      } else if (currentActionManifest.endsWith(".numeric")) {
-        operation.innerHTML = '<option value="set">Set</option><option value="increase">Increase</option><option value="decrease">Decrease</option>';
-        property.innerHTML = '<option value="frontBrightness">Front brightness (%)</option><option value="frontTemperature">Front temperature (K)</option><option value="rearBrightness">LX rear brightness (%)</option>';
-        sensitivity.disabled = true; preset.disabled = false;
-      } else {
-        operation.innerHTML = '<option value="set">Set at dial position</option>';
-        property.innerHTML = '<option value="frontBrightness">Front brightness (%)</option><option value="frontTemperature">Front temperature (K)</option><option value="rearBrightness">LX rear brightness (%)</option>';
-        preset.disabled = true; sensitivity.disabled = false;
+      const property = field("property");
+      const operation = field("operation");
+      property.replaceChildren();
+      property.add(new Option(isPower() ? "Front power" : "Front brightness (%)", "frontBrightness"));
+      if (!isPower()) property.add(new Option("Front temperature (K)", "frontTemperature"));
+      property.add(new Option(isPower() ? "LX rear power" : "LX rear brightness (%)", "rearBrightness"));
+      operation.replaceChildren();
+      const operations = isPower() ? [["toggle", "Toggle"], ["on", "On"], ["off", "Off"]]
+        : isNumeric() ? [["set", "Set"], ["increase", "Increase"], ["decrease", "Decrease"]]
+        : [["set", "Rotate to adjust; press to toggle power"]];
+      for (const [value, label] of operations) operation.add(new Option(label, value));
+      operation.disabled = isDial();
+      field("preset").disabled = !isNumeric();
+      field("sensitivity").disabled = !isDial();
+    }
+    function realSerial(serial) {
+      return typeof serial === "string" && serial.trim() && serial.toUpperCase() !== "UNKNOWN";
+    }
+    function matches(value) {
+      if (!value) return [];
+      const id = value.slice(value.indexOf(":") + 1);
+      return devices.filter((d) => value.startsWith("path:") ? d.device_path === id
+        : realSerial(d.serial_number) && d.serial_number === id);
+    }
+    function rebuildTargets(desired) {
+      const target = field("target");
+      target.replaceChildren(new Option("Select a light", ""));
+      for (const device of devices) {
+        const serial = device.serial_number;
+        const value = realSerial(serial) && matches("serial:" + serial).length === 1
+          ? "serial:" + serial : device.device_path ? "path:" + device.device_path : "";
+        if (!value || matches(value).length !== 1) continue;
+        const label = (device.device_type_display || device.device_type) + " - " + value;
+        target.add(new Option(label, value));
       }
+      if (desired && !Array.from(target.options).some((o) => o.value === desired)) {
+        const found = matches(desired);
+        const label = found.length === 1 ? found[0].device_type_display + " - " + desired
+          : "Unavailable/unreadable or ambiguous - " + desired;
+        target.add(new Option(label, desired));
+      }
+      target.value = desired;
     }
     function load(settings) {
-      const target = document.getElementById("target");
-      const desired = settings.serialNumber ? "serial:" + settings.serialNumber : settings.devicePath ? "path:" + settings.devicePath : "";
-      for (const option of target.options) if (option.value === desired) target.value = desired;
-      document.getElementById("property").value = settings.property || "frontBrightness";
-      document.getElementById("operation").value = settings.operation || "toggle";
-      document.getElementById("preset").value = settings.preset !== undefined ? settings.preset : 5;
-      document.getElementById("sensitivity").value = settings.sensitivity ?? 1;
-      document.getElementById("rear").checked = settings.rear === true;
+      savedSettings = { ...settings };
+      dirty = false;
+      const desired = settings.targetMode === "path" && settings.devicePath ? "path:" + settings.devicePath
+        : settings.serialNumber ? "serial:" + settings.serialNumber : settings.devicePath ? "path:" + settings.devicePath : "";
+      rebuildTargets(desired);
+      field("property").value = isPower() && settings.rear === true ? "rearBrightness" : settings.property || "frontBrightness";
+      field("operation").value = isDial() ? "set" : settings.operation || (isPower() ? "toggle" : "set");
+      field("preset").value = settings.preset ?? 5;
+      field("sensitivity").value = settings.sensitivity ?? 1;
+      update();
     }
-    for (const id of fields) document.getElementById(id).addEventListener("change", save);
+    function update() {
+      const found = matches(field("target").value);
+      const device = found.length === 1 ? found[0] : null;
+      const property = field("property").value;
+      field("property").querySelector('[value="rearBrightness"]').disabled = !device || !device.has_back_side;
+      const temperature = property === "frontTemperature";
+      const absolute = field("operation").value === "set";
+      const preset = field("preset");
+      preset.min = temperature && absolute && device ? device.minimum_temperature_in_kelvin
+        : property === "rearBrightness" && absolute ? 1 : 0;
+      preset.max = temperature && device ? absolute ? device.maximum_temperature_in_kelvin
+        : (device.maximum_temperature_in_kelvin - device.minimum_temperature_in_kelvin) / 100 : 100;
+      preset.step = temperature && absolute ? 100 : 1;
+      field("presetLabel").textContent = temperature ? absolute ? "Preset (K)" : "Change (100 K steps)"
+        : absolute ? "Preset (%)" : "Change (percentage points)";
+      field("units").textContent = isDial() ? temperature
+        ? "Each detent changes temperature by sensitivity x 100 K. Press toggles front power."
+        : "Each detent changes brightness by sensitivity percentage points. Press toggles this side's power."
+        : "Front brightness 0% is minimum brightness, not Off.";
+      field("save").disabled = pendingSettings !== null;
+      field("cancel").disabled = pendingSettings !== null;
+      field("target").disabled = pendingSettings !== null;
+      field("property").disabled = pendingSettings !== null;
+      field("operation").disabled = pendingSettings !== null || isDial();
+      field("preset").disabled = pendingSettings !== null || !isNumeric();
+      field("sensitivity").disabled = pendingSettings !== null || !isDial();
+      let status = discoveryError;
+      if (!status && devices.length === 0) status = "No readable lights. Connect a light and refresh.";
+      if (!status && !field("target").value) status = "Select a light. No light is selected automatically.";
+      if (!status && !device) status = "Selected light is unavailable/unreadable or ambiguous. Refresh or explicitly select a light.";
+      if (!status && property === "rearBrightness" && !device.has_back_side) status = "Rear controls are not supported by this light. Choose a front property.";
+      if (!status && device) {
+        const rear = property === "rearBrightness";
+        const power = rear ? device.is_back_on : device.is_on;
+        const powerText = power === null ? "unknown" : power ? "ON" : "OFF";
+        let value;
+        if (isPower()) value = "Power " + powerText;
+        else if (temperature) value = device.temperature_in_kelvin + " K; range "
+          + device.minimum_temperature_in_kelvin + "-" + device.maximum_temperature_in_kelvin + " K; power " + powerText;
+        else if (rear) value = (device.back_brightness_percentage === null ? "Rear brightness unknown" : device.back_brightness_percentage + "%")
+          + "; range 1-100%; power " + powerText;
+        else value = Math.round(100 * (device.brightness_in_lumen - device.minimum_brightness_in_lumen)
+          / (device.maximum_brightness_in_lumen - device.minimum_brightness_in_lumen)) + "% ("
+          + device.brightness_in_lumen + " lm); range 0-100% (" + device.minimum_brightness_in_lumen
+          + "-" + device.maximum_brightness_in_lumen + " lm); power " + powerText;
+        status = "Device-reported: " + value + ". Refresh lights to read again.";
+      }
+      field("status").textContent = pendingSettings ? "Saving settings..." : status;
+    }
+    for (const id of ["target", "property", "operation", "preset", "sensitivity"]) {
+      field(id).addEventListener("change", () => { dirty = true; update(); });
+    }
+    field("refresh").addEventListener("click", () => {
+      if (send({ event: "refreshDevices" })) field("status").textContent = "Reading lights...";
+    });
+    field("cancel").addEventListener("click", () => load(savedSettings));
+    field("save").addEventListener("click", save);
     function save() {
-      const selected = document.getElementById("target").value;
-      const [mode, ...parts] = selected.split(":");
-      const target = parts.join(":").trim();
-      const sensitivityValue = Math.min(5, Math.max(1, Number(document.getElementById("sensitivity").value) || 1));
+      if (pendingSettings) return;
+      const selected = field("target").value;
+      const found = matches(selected);
+      let error = !selected ? "Select a light before saving." : found.length !== 1
+        ? "Selected light is unavailable/unreadable or ambiguous. Select a readable light." : discoveryError;
+      const property = field("property").value;
+      const operation = field("operation").value;
+      if (!error && (!property || !operation)) error = "Choose a valid property and operation.";
+      if (!error && property === "rearBrightness" && !found[0].has_back_side) error = "Rear controls are not supported by this light.";
+      if (!error && isNumeric() && (!field("preset").value || !field("preset").checkValidity())) error = "Enter a preset/change within the displayed range and step.";
+      if (!error && isDial() && (!field("sensitivity").value || !field("sensitivity").checkValidity())) error = "Sensitivity must be an integer from 1 to 5 steps per detent.";
+      if (error) { field("status").textContent = error; return; }
+      const mode = selected.startsWith("path:") ? "path" : "serial";
+      const target = selected.slice(selected.indexOf(":") + 1);
       const settings = {
-        targetMode: mode === "path" ? "path" : "serial",
+        ...savedSettings,
+        targetMode: mode,
         serialNumber: mode === "serial" ? target : "",
         devicePath: mode === "path" ? target : "",
-        property: document.getElementById("property").value,
-        operation: document.getElementById("operation").value,
-        preset: Number(document.getElementById("preset").value),
-        sensitivity: sensitivityValue,
-        rear: document.getElementById("rear").checked
+        property, operation,
+        rear: property === "rearBrightness"
       };
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({
-          event: "sendToPlugin",
-          action: uuid,
-          context: actionInfo.context,
-          payload: { event: "saveSettings", settings }
-        }));
+      if (isNumeric()) settings.preset = Number(field("preset").value);
+      if (isDial()) settings.sensitivity = Number(field("sensitivity").value);
+      if (send({ event: "saveSettings", settings })) {
+        pendingSettings = settings;
+        update();
       }
     }
   </script>

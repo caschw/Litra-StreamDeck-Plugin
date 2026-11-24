@@ -13,11 +13,13 @@ The plugin bundles litra-rs and Stream Deck supplies Node.js. Do not install or 
 
 1. Add a Litra Power, Numeric, or Dial action.
 2. Open the property inspector.
-3. Enter the exact serial number, or the exact path for a device that has no serial.
+3. Explicitly select a readable light in the picker. No light is selected automatically. Missing or duplicate serials use an exact device path.
 4. Choose the front/rear property and operation.
-5. Set brightness/temperature presets or 1-5 dial sensitivity.
+5. Set brightness/temperature presets or 1-5 steps per detent for dial sensitivity. Temperature steps are 100 K; brightness steps are percentage points.
+6. Choose **Save settings** to apply, or **Cancel** to restore the saved configuration. Refresh lights reads the selected light's current value and range without changing unsaved edits.
 
 Missing serials require path targeting. A missing selected light is not necessarily unplugged; the helper may omit unreadable devices.
+Rear controls are disabled for lights without an LX rear side. An unavailable saved selection is retained, never silently replaced by another light.
 
 ## State feedback
 
